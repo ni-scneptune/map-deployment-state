@@ -36,6 +36,7 @@
     transform: rotate(360deg);
   }
 }
+<<<<<<< HEAD
 
 .code-block {
   max-width: 500px;
@@ -48,3 +49,5 @@
   flex-direction: row;
   align-items: center;
 }
+=======
+>>>>>>> 25d838b... Initialize project using Create React App
