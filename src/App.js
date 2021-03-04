@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 43d9217... first test. init
 import logo from "./logo.svg";
 import "./App.css";
 import { useState, useContext, createContext } from "react";
@@ -122,7 +118,6 @@ function ExampleProvider({ children }) {
   }
   Object.freeze(queuedDownloadUpids);
   //From this point on queuedDownloadUpids is a read-only object, thus making it immutable.
-<<<<<<< HEAD
 
   return (
     <ExampleHashContext.Provider
@@ -247,146 +242,6 @@ function ValueDumpComponent() {
         })}
       </div>
     </div>
-  );
-}
-
-function App() {
-  return (
-    <ExampleProvider>
-      <div className="App">
-        <ValueDumpComponent />
-      </div>
-    </ExampleProvider>
-=======
-import logo from './logo.svg';
-import './App.css';
-=======
->>>>>>> 43d9217... first test. init
-
-  return (
-    <ExampleHashContext.Provider
-      value={{
-        hashMap,
-        activeDownloadUpid,
-        setActiveDownloadUpid,
-        queuedDownloadUpids,
-        updateHashState
-      }}
-    >
-      {children}
-    </ExampleHashContext.Provider>
-  );
-}
-
-function ValueDumpComponent() {
-  const {
-    hashMap,
-    activeDownloadUpid,
-    setActiveDownloadUpid,
-    queuedDownloadUpids,
-    updateHashState
-  } = useContext(ExampleHashContext);
-  const formulateAnObject = {};
-  for (let [key, value] of hashMap.entries()) {
-    formulateAnObject[key] = value;
-  }
-  function handleClickEventHashMap(event) {
-    event.preventDefault();
-    // find the currentValue, increase it by 1;
-    const value = hashMap.get("84573-28302-03845-37424");
-    hashMap.setPropertyOnValue("84573-28302-03845-37424", {
-      progress: value.progress + 1
-    });
-    //a lways send the hashMap back in the updateState
-    // so it can regenerate the immutable object and trigger a re-render.
-    updateHashState(hashMap);
-  }
-  function handleReorderOfDownloadQueue(ev) {
-    ev.preventDefault();
-    // randomly move an index.
-    const randomIndex = Math.ceil(
-      Math.random() * queuedDownloadUpids.length - 1
-    );
-    const upidMoving = queuedDownloadUpids[randomIndex];
-    // move the upid from one point in the array to another.
-    const newlyReorderedArr = [
-      ...queuedDownloadUpids.slice(0, randomIndex),
-      ...queuedDownloadUpids.slice(randomIndex + 1),
-      upidMoving
-    ];
-    hashMap.reorderKeys(newlyReorderedArr);
-    updateHashState(hashMap);
-  }
-
-  function handleDeleteADownloadQueueItem(upid) {
-    if (upid === activeDownloadUpid) {
-      setActiveDownloadUpid(null);
-    }
-    hashMap.delete(upid);
-    updateHashState(hashMap);
-  }
-
-  const deploymentStatusMapToArr = hashMap.asMapArray();
-
-  return (
-    <div>
-      <button onClick={handleClickEventHashMap}> Update a property </button>
-      <button onClick={handleReorderOfDownloadQueue}>
-        Shuffle A Queue Upid
-      </button>
-      <div className="code-block">
-        <p>active download</p>
-        <p>{String(activeDownloadUpid)}</p>
-        <button onClick={() => setActiveDownloadUpid(null)}>
-          Clear ActiveDownload
-        </button>
-      </div>
-      <div className="code-block">
-        <p> queuedDownloadUpids </p>
-        {queuedDownloadUpids.join(" , ")}
-      </div>
-      <hr />
-      <div>
-        {deploymentStatusMapToArr.map(({ key, ...values }) => {
-          return (
-            <div key={key} className="code-block">
-              <div className="section">
-                <h4>UPID:</h4>
-                <p>{key}</p>
-              </div>
-              <div className="section">
-                <button onClick={() => setActiveDownloadUpid(key)}>
-                  {" "}
-                  set activeDownload{" "}
-                </button>
-                <button
-                  onClick={ev => {
-                    ev.preventDefault();
-                    handleDeleteADownloadQueueItem(key);
-                  }}
-                >
-                  {" "}
-                  remove this entire row from deploymentQueue.{" "}
-                </button>
-              </div>
-              <div className="section">
-                <h4>deploymentId:</h4>
-                <p>{values.deploymentId}</p>
-              </div>
-              <div className="section">
-                <h4>progress:</h4>
-                <p>{String(values.progress)}</p>
-              </div>
-              <div className="section">
-                <h4>event:</h4>
-                <p>{values.event}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
->>>>>>> 25d838b... Initialize project using Create React App
   );
 }
 
