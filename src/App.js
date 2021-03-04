@@ -1,7 +1,6 @@
-import logo from "./logo.svg";
 import "./App.css";
 import { useState, useContext, createContext } from "react";
-import BiMap from "./TwoWayMap";
+// import BiMap from "./TwoWayMap";
 const ExampleHashContext = createContext();
 
 // const TwoWayBinding = new BiMap(hashmap, ["upid", "deploymentId"]);
@@ -17,6 +16,18 @@ class DeploymentStatusMap extends Map {
     // This is a nice helper when we just add
     this.set(upid, this.emptyDeploymentStatus);
     return this;
+  };
+  getPropertyOnValue = (upid, propertyKey) => {
+    const keyExists = this.has(upid);
+    if (keyExists) {
+      const value = this.get(upid);
+      if (value && typeof value === "object") {
+        return value[propertyKey];
+      } else {
+        // if it's not an object just give me the whole value, thats a safe fallback.
+        return value;
+      }
+    }
   };
   setPropertyOnValue = (upid, property) => {
     const keyPairExists = this.has(upid);
@@ -50,7 +61,7 @@ class DeploymentStatusMap extends Map {
   asMapArray = () => {
     const arrayOfHashMapObject = [];
     this.forEach((value, key) => {
-      arrayOfHashMapObject.push({ key, ...value });
+      arrayOfHashMapObject.push({ upid: key, ...value });
     });
     return arrayOfHashMapObject;
   };
@@ -134,6 +145,12 @@ function ExampleProvider({ children }) {
   );
 }
 
+const exampleUpidsToAdd = [
+  "82903-29393-49495-11249",
+  "93940-22341-84932-77342",
+  "92034-34912-44902-92301"
+];
+
 function ValueDumpComponent() {
   const {
     hashMap,
@@ -149,9 +166,12 @@ function ValueDumpComponent() {
   function handleClickEventHashMap(event) {
     event.preventDefault();
     // find the currentValue, increase it by 1;
-    const value = hashMap.get("84573-28302-03845-37424");
+    const currentProgress = hashMap.getPropertyOnValue(
+      "84573-28302-03845-37424",
+      "progress"
+    );
     hashMap.setPropertyOnValue("84573-28302-03845-37424", {
-      progress: value.progress + 1
+      progress: currentProgress + 1
     });
     //a lways send the hashMap back in the updateState
     // so it can regenerate the immutable object and trigger a re-render.
@@ -182,6 +202,15 @@ function ValueDumpComponent() {
     updateHashState(hashMap);
   }
 
+  function createANewDeployment() {
+    const upidToAdd = exampleUpidsToAdd.shift();
+    console.log(upidToAdd);
+    if (upidToAdd) {
+      const updatedHash = hashMap.setEmptyDeploymentStatus(upidToAdd);
+      updateHashState(updatedHash);
+    }
+  }
+
   const deploymentStatusMapToArr = hashMap.asMapArray();
 
   return (
@@ -189,6 +218,9 @@ function ValueDumpComponent() {
       <button onClick={handleClickEventHashMap}> Update a property </button>
       <button onClick={handleReorderOfDownloadQueue}>
         Shuffle A Queue Upid
+      </button>
+      <button onClick={() => createANewDeployment()}>
+        Add a random upid with empty deploymentState
       </button>
       <div className="code-block">
         <p>active download</p>
@@ -203,22 +235,22 @@ function ValueDumpComponent() {
       </div>
       <hr />
       <div>
-        {deploymentStatusMapToArr.map(({ key, ...values }) => {
+        {deploymentStatusMapToArr.map(({ upid, ...values }) => {
           return (
-            <div key={key} className="code-block">
+            <div key={upid} className="code-block">
               <div className="section">
                 <h4>UPID:</h4>
-                <p>{key}</p>
+                <p>{upid}</p>
               </div>
               <div className="section">
-                <button onClick={() => setActiveDownloadUpid(key)}>
+                <button onClick={() => setActiveDownloadUpid(upid)}>
                   {" "}
                   set activeDownload{" "}
                 </button>
                 <button
                   onClick={ev => {
                     ev.preventDefault();
-                    handleDeleteADownloadQueueItem(key);
+                    handleDeleteADownloadQueueItem(upid);
                   }}
                 >
                   {" "}
