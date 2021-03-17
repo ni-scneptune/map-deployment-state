@@ -261,7 +261,7 @@ function ActiveDownloadStatusProvider(props) {
 const DownloadFunctionsContext = createContext();
 
 function DownloadFunctionsProvider(props) {
-  const { hashMap, activeDownloadUpid, setActiveDownloadUpid, removeEntity, reorderKeys} = useContext(ExampleHashContext);
+  const { hashMap, activeDownloadUpid, setActiveDownloadUpid, removeEntity, reorderKeys, setEmptyDeploymentStatus} = useContext(ExampleHashContext);
 
   function handleReorderOfDownloadQueue(ev) {
      const clonedHashMap = produce(hashMap, (draftHashMap) => {
