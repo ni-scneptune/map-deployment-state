@@ -1,71 +1,12 @@
 import "./App.css";
-import { useState, useContext, createContext } from "react";
+import { useState, useContext, createContext, useCallback, useEffect } from "react";
+import { enableMapSet, produce, current } from "immer";
+
+enableMapSet();
 // import BiMap from "./TwoWayMap";
 const ExampleHashContext = createContext();
 
 // const TwoWayBinding = new BiMap(hashmap, ["upid", "deploymentId"]);
-
-class DeploymentStatusMap extends Map {
-  emptyDeploymentStatus = {
-    deploymentId: null,
-    name: null,
-    event: null,
-    progress: null
-  };
-  setEmptyDeploymentStatus = upid => {
-    // This is a nice helper when we just add
-    this.set(upid, this.emptyDeploymentStatus);
-    return this;
-  };
-  getPropertyOnValue = (upid, propertyKey) => {
-    const keyExists = this.has(upid);
-    if (keyExists) {
-      const value = this.get(upid);
-      if (value && typeof value === "object") {
-        return value[propertyKey];
-      } else {
-        // if it's not an object just give me the whole value, thats a safe fallback.
-        return value;
-      }
-    }
-  };
-  setPropertyOnValue = (upid, property) => {
-    const keyPairExists = this.has(upid);
-    const valueExists = this.get(upid);
-    let mergingProperty;
-    // if our value is an object, we want to immutably copy it with our
-    // new property, so we can use object spread here.
-    if (keyPairExists && valueExists && typeof valueExists === "object") {
-      mergingProperty = { ...valueExists, ...property };
-    } else {
-      // otherwise, the new value is the new property.
-      mergingProperty = property;
-    }
-    this.set(upid, mergingProperty);
-    return this;
-  };
-  reorderKeys = arrKeys => {
-    arrKeys.forEach(key => {
-      // values persist, we are just shuffling keys
-      const currentValue = this.get(key);
-      // remove the key in the old position in the map.
-      this.delete(key);
-      // set the key again, but now because
-      // of the iteration of the arrKeys we will be set in order.
-      // This is a big advantage over using a standard object,
-      // that always tries to alphanumerically order object keys.
-      this.set(key, currentValue);
-    });
-    return this;
-  };
-  asMapArray = () => {
-    const arrayOfHashMapObject = [];
-    this.forEach((value, key) => {
-      arrayOfHashMapObject.push({ upid: key, ...value });
-    });
-    return arrayOfHashMapObject;
-  };
-}
 
 const exampleHashData = {
   "32424-34242-34232-84424": {
@@ -106,20 +47,106 @@ const exampleHashData = {
   }
 };
 
+var intermittenProgress = 0.0;
+
+function generateEventWithProgress() {
+  intermittenProgress = Number(Number(
+    intermittenProgress + (Math.random() * 0.1)
+  ).toFixed(4))
+  return {
+    deploymentId: "27520-11321-64093-45900",
+    upid: "16023-28902-73845-35622",
+    event: "DownloadReceivedProgress",
+    progress: intermittenProgress
+  };
+}
+
+
+
 const hashmap = Object.keys(exampleHashData).map(key => {
   return [key, exampleHashData[key]];
 });
+const emptyDeploymentStatus = {
+  deploymentId: null,
+  name: null,
+  event: null,
+  progress: null,
+};
 
-const DownloadHashMap = new DeploymentStatusMap(hashmap);
+const DownloadHashMap = new Map(hashmap);
 
 function ExampleProvider({ children }) {
   const [hashMap, setHashState] = useState(DownloadHashMap);
   const [activeDownloadUpid, setActiveDownloadUpid] = useState(null);
   function updateHashState(nextMapValue) {
-    if (nextMapValue instanceof DeploymentStatusMap) {
-      setHashState(new DeploymentStatusMap(nextMapValue));
+    if (nextMapValue instanceof Map) {
+      setHashState(new Map(nextMapValue));
     }
   }
+
+  const setEmptyDeploymentStatus = useCallback((upid) => {
+    // This is a nice helper when we just add
+    const nextHashMap = produce(hashMap, draftHashMap => {
+      draftHashMap.set(upid, emptyDeploymentStatus);
+    })
+    return updateHashState(nextHashMap)
+  }, [hashMap]);
+  const getPropertyOnValue = useCallback((upid, propertyKey) => {
+    const keyExists = hashMap.has(upid);
+    if (keyExists) {
+      const value = hashMap.get(upid);
+      if (value && typeof value === "object") {
+        return value[propertyKey];
+      } else {
+        // if it's not an object just give me the whole value, thats a safe fallback.
+        return value;
+      }
+    }
+  }, [hashMap]);
+  const setPropertyOnValue = useCallback((upid, property) => {
+    const keyPairExists = hashMap.has(upid);
+    const valueExists = hashMap.get(upid);
+    let mergingProperty;
+    // if our value is an object, we want to immutably copy it with our
+    // new property, so we can use object spread here.
+    if (keyPairExists && valueExists && typeof valueExists === "object") {
+      mergingProperty = { ...valueExists, ...property };
+    } else {
+      // otherwise, the new value is the new property.
+      mergingProperty = property;
+    }
+    const nextHashMap = produce(hashMap, draftHashMap => {
+      draftHashMap.set(upid, mergingProperty);
+    });
+    return updateHashState(nextHashMap)
+  }, [hashMap]);
+  const reorderKeys = useCallback((arrKeys) => {
+    const nextHashMap = produce(
+      hashMap,
+      (draftHashMap) => {
+        arrKeys.forEach((key) => {
+          // values persist, we are just shuffling keys
+          const currentValue = current(draftHashMap).get(key);
+          // remove the key in the old position in the map.
+          draftHashMap.delete(key);
+          // set the key again, but now because
+          // of the iteration of the arrKeys we will be set in order.
+          // This is a big advantage over using a standard object,
+          // that always tries to alphanumerically order object keys.
+          draftHashMap.set(key, currentValue);
+        });
+      }
+    );
+    return updateHashState(nextHashMap);
+  }, [hashMap]);
+  const removeEntity = useCallback((key) => {
+    const nextHashMap = produce(hashMap, draftHashMap => {
+      draftHashMap.delete(key)
+    })
+    return updateHashState(nextHashMap);
+  }, [hashMap]);
+
+
 
   let queuedDownloadUpids = [];
   for (let key of hashMap.keys()) {
@@ -130,6 +157,24 @@ function ExampleProvider({ children }) {
   Object.freeze(queuedDownloadUpids);
   //From this point on queuedDownloadUpids is a read-only object, thus making it immutable.
 
+
+  useEffect(() => {
+    function startFakePoll() {
+      const pollingIntervalId = setInterval(() => {
+        const eventFromFakePoll = generateEventWithProgress();
+
+        setPropertyOnValue(eventFromFakePoll.upid, {
+          deploymentId: eventFromFakePoll.deploymentId,
+          progress: eventFromFakePoll.progress,
+          event: eventFromFakePoll.event,
+        });
+      }, 1000);
+      return () => clearInterval(pollingIntervalId);
+    }
+    const fakePoll = startFakePoll();
+    return fakePoll;
+  }, [setPropertyOnValue]);
+
   return (
     <ExampleHashContext.Provider
       value={{
@@ -137,7 +182,11 @@ function ExampleProvider({ children }) {
         activeDownloadUpid,
         setActiveDownloadUpid,
         queuedDownloadUpids,
-        updateHashState
+        setEmptyDeploymentStatus,
+        getPropertyOnValue,
+        setPropertyOnValue,
+        reorderKeys,
+        removeEntity
       }}
     >
       {children}
@@ -157,7 +206,11 @@ function ValueDumpComponent() {
     activeDownloadUpid,
     setActiveDownloadUpid,
     queuedDownloadUpids,
-    updateHashState
+    setEmptyDeploymentStatus,
+    getPropertyOnValue,
+    setPropertyOnValue,
+    reorderKeys,
+    removeEntity
   } = useContext(ExampleHashContext);
   const formulateAnObject = {};
   for (let [key, value] of hashMap.entries()) {
@@ -166,16 +219,13 @@ function ValueDumpComponent() {
   function handleClickEventHashMap(event) {
     event.preventDefault();
     // find the currentValue, increase it by 1;
-    const currentProgress = hashMap.getPropertyOnValue(
+    const currentProgress = getPropertyOnValue(
       "84573-28302-03845-37424",
       "progress"
     );
-    hashMap.setPropertyOnValue("84573-28302-03845-37424", {
+    setPropertyOnValue("84573-28302-03845-37424", {
       progress: currentProgress + 1
     });
-    //a lways send the hashMap back in the updateState
-    // so it can regenerate the immutable object and trigger a re-render.
-    updateHashState(hashMap);
   }
   function handleReorderOfDownloadQueue(ev) {
     ev.preventDefault();
@@ -190,28 +240,34 @@ function ValueDumpComponent() {
       ...queuedDownloadUpids.slice(randomIndex + 1),
       upidMoving
     ];
-    hashMap.reorderKeys(newlyReorderedArr);
-    updateHashState(hashMap);
+    reorderKeys(newlyReorderedArr);
   }
 
   function handleDeleteADownloadQueueItem(upid) {
     if (upid === activeDownloadUpid) {
       setActiveDownloadUpid(null);
     }
-    hashMap.delete(upid);
-    updateHashState(hashMap);
+    // an example of an item getting removed after installation. or cancel.
+    removeEntity(upid);
   }
 
   function createANewDeployment() {
     const upidToAdd = exampleUpidsToAdd.shift();
     console.log(upidToAdd);
     if (upidToAdd) {
-      const updatedHash = hashMap.setEmptyDeploymentStatus(upidToAdd);
-      updateHashState(updatedHash);
+      // an example of how easy it is to add new items to queue,
+      setEmptyDeploymentStatus(upidToAdd);
     }
   }
+  const asMapArray = useCallback(() => {
+    const arrayOfHashMapObject = [];
+    hashMap.forEach((value, key) => {
+      arrayOfHashMapObject.push({ upid: key, ...value });
+    });
+    return arrayOfHashMapObject;
+  }, [hashMap]);
 
-  const deploymentStatusMapToArr = hashMap.asMapArray();
+  const deploymentStatusMapToArr = asMapArray();
 
   return (
     <div>
