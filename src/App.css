@@ -48,3 +48,15 @@
   flex-direction: row;
   align-items: center;
 }
+
+.active-row {
+  background-color:aquamarine;
+}
+
+.queueRows {
+  background-color:orange;
+}
+
+.queueRow {
+  background-color: orangered;
+}
