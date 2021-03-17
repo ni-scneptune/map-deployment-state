@@ -258,25 +258,19 @@ function ActiveDownloadStatusProvider(props) {
   return <ActiveDownloadStatusContext.Provider value={activeDownloadStatus} {...props} />
 }
 
-function Container() {
-  const {
-    reorderKeys,
-    removeEntity,
-    setEmptyDeploymentStatus,
-    hashMap,
-    activeDownloadUpid,
-    setActiveDownloadUpid,
-  } = useContext(ExampleHashContext);
-  const clonedHashMap = produce(hashMap, draftHashMap =>{
-    draftHashMap.delete(activeDownloadUpid);
-  });
+const DownloadFunctionsContext = createContext();
+
+function DownloadFunctionsProvider(props) {
+  const { hashMap, activeDownloadUpid, setActiveDownloadUpid, removeEntity, reorderKeys} = useContext(ExampleHashContext);
+
   function handleReorderOfDownloadQueue(ev) {
-    const queuedDownloadUpids = Array.from(clonedHashMap.keys())
+     const clonedHashMap = produce(hashMap, (draftHashMap) => {
+       draftHashMap.delete(activeDownloadUpid);
+     });
+    const queuedDownloadUpids = Array.from(clonedHashMap.keys());
     ev.preventDefault();
     // randomly move an index.
-    const randomIndex = Math.ceil(
-      Math.random() * queuedDownloadUpids.length - 1
-    );
+    const randomIndex = Math.ceil(Math.random() * queuedDownloadUpids.length - 1);
     const upidMoving = queuedDownloadUpids[randomIndex];
     // move the upid from one point in the array to another.
     const newlyReorderedArr = [
@@ -285,23 +279,38 @@ function Container() {
       upidMoving,
     ];
     reorderKeys(newlyReorderedArr);
+}
+
+function handleDeleteADownloadQueueItem(upid) {
+  // an example of an item getting removed after installation. or cancel.
+  removeEntity(upid);
+}
+
+function createANewDeployment() {
+  const upidToAdd = exampleUpidsToAdd.shift();
+  console.log(upidToAdd);
+  if (upidToAdd) {
+    // an example of how easy it is to add new items to queue,
+    setEmptyDeploymentStatus(upidToAdd);
   }
+}
+  const downloadFunctionsValue = {
+    handleReorderOfDownloadQueue,
+    handleDeleteADownloadQueueItem,
+    createANewDeployment,
+    setActiveDownloadUpid,
+  };
 
-    function handleDeleteADownloadQueueItem(upid) {
-      // an example of an item getting removed after installation. or cancel.
-      removeEntity(upid);
-    }
+  return <DownloadFunctionsContext.Provider value={downloadFunctionsValue} {...props} />;
+}
 
-   
-  function createANewDeployment() {
-     const upidToAdd = exampleUpidsToAdd.shift();
-     console.log(upidToAdd);
-     if (upidToAdd) {
-       // an example of how easy it is to add new items to queue,
-       setEmptyDeploymentStatus(upidToAdd);
-     }
-   }
 
+function Container() {
+  const {
+    createANewDeployment,
+    handleReorderOfDownloadQueue,
+  } = useContext(DownloadFunctionsContext);
+ 
   return (
     <div>
       <div className="section">
@@ -314,26 +323,24 @@ function Container() {
       </div>
       <div>
         <ActiveDownloadStatusProvider>
-          <ActiveDownloadRow
-            handleDeleteADownloadQueueItem={handleDeleteADownloadQueueItem}
-          />
+          <ActiveDownloadRow />
         </ActiveDownloadStatusProvider>
       </div>
       <QueuedStatusRowProvider>
         <div className="queueRows">
-          <QueueList
-            handleDeleteADownloadQueueItem={handleDeleteADownloadQueueItem}
-            setActiveDownloadUpid={setActiveDownloadUpid}
-          />
+          <QueueList />
         </div>
       </QueuedStatusRowProvider>
     </div>
   );
 }
 
-function QueueList({handleDeleteADownloadQueueItem, setActiveDownloadUpid}) {
+function QueueList() {
   const queuedStatus = useContext(
     QueuedStatusRowContext
+  );
+  const { handleDeleteADownloadQueueItem, setActiveDownloadUpid } = useContext(
+    DownloadFunctionsContext
   );
   const queueRenderCount = useRef(0)
 
@@ -405,8 +412,9 @@ function QueueRow({
   );
 }
 
-function ActiveDownloadRow({ handleDeleteADownloadQueueItem }) {
+function ActiveDownloadRow( ) {
   const activeDownloadStatus = useContext(ActiveDownloadStatusContext);
+  const {handleDeleteADownloadQueueItem} = useContext(DownloadFunctionsContext);
   const activeDownloadRowRender = useRef(0);
   if (!activeDownloadStatus) {
     return null;
@@ -456,9 +464,11 @@ function ActiveDownloadRow({ handleDeleteADownloadQueueItem }) {
 function App() {
   return (
     <ExampleProvider>
+      <DownloadFunctionsProvider>
       <div className="App">
         <Container />
       </div>
+      </DownloadFunctionsProvider>
     </ExampleProvider>
   );
 }
