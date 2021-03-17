@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  Fragment,
 } from "react";
 import { enableMapSet, produce, current } from "immer";
 
@@ -337,7 +338,7 @@ function QueueList({handleDeleteADownloadQueueItem, setActiveDownloadUpid}) {
   const queueRenderCount = useRef(0)
 
   return (
-    <>
+    <Fragment>
       <p>This queue has been rendered: {queueRenderCount.current++} times</p>
       {queuedStatus.map((queueStatus, index) => (
         <QueueRow
@@ -347,7 +348,7 @@ function QueueList({handleDeleteADownloadQueueItem, setActiveDownloadUpid}) {
           {...queueStatus}
         />
       ))}
-    </>
+    </Fragment>
   );
 }
 
