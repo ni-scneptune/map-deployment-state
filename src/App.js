@@ -244,16 +244,19 @@ const ActiveDownloadStatusContext = createContext();
 function ActiveDownloadStatusProvider(props) {
   const { hashMap, activeDownloadUpid} = useContext(ExampleHashContext);
 
+
+  const cachedActiveState = JSON.stringify(hashMap.get(activeDownloadUpid))
+  
   const activeDownloadStatus = useMemo(() => {
     if (hashMap.has(activeDownloadUpid)) {
       const activeDownloadDeploymentStatus = hashMap.get(activeDownloadUpid);
       return {
         upid: activeDownloadUpid,
-        ...activeDownloadDeploymentStatus
-      }
+        ...activeDownloadDeploymentStatus,
+      };
     }
     return null;
-  }, [hashMap.has(activeDownloadUpid), activeDownloadUpid]);
+  }, [cachedActiveState, activeDownloadUpid]);
 
   return <ActiveDownloadStatusContext.Provider value={activeDownloadStatus} {...props} />
 }
