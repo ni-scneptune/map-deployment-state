@@ -9,52 +9,28 @@ import {
   useRef,
   Fragment,
 } from "react";
-import { enableMapSet, produce, current } from "immer";
+import { enableMapSet, produce } from "immer";
+import {
+  setPropertyOnValue,
+  reorderKeys,
+  removeEntity,
+  resetState,
+  setActiveDownloadUpid,
+  setEmptyDeploymentStatus,
+} from "./Redux/Actions";
+import {
+  createSelector,
+  createSelectorCreator,
+  defaultMemoize,
+} from "reselect";
+import {
+  Provider as ReduxProvider,
+  useSelector,
+  useDispatch,
+} from "react-redux";
+import store from "./Redux/Store";
 
 enableMapSet();
-// import BiMap from "./TwoWayMap";
-const ExampleHashContext = createContext();
-
-// const TwoWayBinding = new BiMap(hashmap, ["upid", "deploymentId"]);
-
-const exampleHashData = {
-  "32424-34242-34232-84424": {
-    deploymentId: "30303-42420-234234-23424",
-    name: "Example Name A",
-    event: "DownloadingStarted",
-    progress: 27.01,
-  },
-  "92935-78002-20920-29234": {
-    deploymentId: "02902-90493-45092-08234",
-    name: "Example Name B",
-    event: "DownloadError",
-    progress: null,
-  },
-  "84573-28302-03845-37424": {
-    deploymentId: "32020-11242-34093-45908",
-    name: "Example Name C",
-    event: "DownloadingStarted",
-    progress: 0.0,
-  },
-  "86093-28402-03845-37624": {
-    deploymentId: "36020-81321-34033-45908",
-    name: "Example Name D",
-    event: "DownloadingStarted",
-    progress: 67.891,
-  },
-  "16023-28902-73845-35622": {
-    deploymentId: "27520-11321-64093-45900",
-    name: "Example Name E",
-    event: "DownloadingStarted",
-    progress: 0.0,
-  },
-  "19453-26862-73845-62624": {
-    deploymentId: "97920-18321-64084-15200",
-    name: "Example Name F",
-    event: "DownloadingStarted",
-    progress: 19.276,
-  },
-};
 
 var intermittenProgress = 0.0;
 
@@ -69,145 +45,9 @@ function generateEventWithProgress() {
     progress: intermittenProgress,
   };
 }
+function DownloadManagerProvider({ children }) {
 
-const hashmap = Object.keys(exampleHashData).map((key) => {
-  return [key, exampleHashData[key]];
-});
-const emptyDeploymentStatus = {
-  deploymentId: null,
-  name: null,
-  event: null,
-  progress: null,
-};
-
-const DownloadHashMap = new Map(hashmap);
-
-function ExampleProvider({ children }) {
-  const [hashMap, setHashState] = useState(DownloadHashMap);
-  const [activeDownloadUpid, setActiveDownloadUpid] = useState(null);
-  function updateHashState(nextMapValue) {
-    if (nextMapValue instanceof Map) {
-      setHashState(new Map(nextMapValue));
-    }
-  }
-
-  const setEmptyDeploymentStatus = useCallback(
-    (upid) => {
-      // This is a nice helper when we just add
-      const nextHashMap = produce(hashMap, (draftHashMap) => {
-        draftHashMap.set(upid, emptyDeploymentStatus);
-      });
-      return updateHashState(nextHashMap);
-    },
-    [hashMap]
-  );
-  const getPropertyOnValue = useCallback(
-    (upid, propertyKey) => {
-      const keyExists = hashMap.has(upid);
-      if (keyExists) {
-        const value = hashMap.get(upid);
-        if (value && typeof value === "object") {
-          return value[propertyKey];
-        } else {
-          // if it's not an object just give me the whole value, thats a safe fallback.
-          return value;
-        }
-      }
-    },
-    [hashMap]
-  );
-  const setPropertyOnValue = useCallback(
-    (upid, property) => {
-      const keyPairExists = hashMap.has(upid);
-      const valueExists = hashMap.get(upid);
-      let mergingProperty;
-      // if our value is an object, we want to immutably copy it with our
-      // new property, so we can use object spread here.
-      if (keyPairExists && valueExists && typeof valueExists === "object") {
-        mergingProperty = { ...valueExists, ...property };
-      } else {
-        // otherwise, the new value is the new property.
-        mergingProperty = property;
-      }
-      const nextHashMap = produce(hashMap, (draftHashMap) => {
-        draftHashMap.set(upid, mergingProperty);
-      });
-      return updateHashState(nextHashMap);
-    },
-    [hashMap]
-  );
-  const reorderKeys = useCallback(
-    (arrKeys) => {
-      const nextHashMap = produce(hashMap, (draftHashMap) => {
-        arrKeys.forEach((key) => {
-          // values persist, we are just shuffling keys
-          const currentValue = current(draftHashMap).get(key);
-          // remove the key in the old position in the map.
-          draftHashMap.delete(key);
-          // set the key again, but now because
-          // of the iteration of the arrKeys we will be set in order.
-          // This is a big advantage over using a standard object,
-          // that always tries to alphanumerically order object keys.
-          draftHashMap.set(key, currentValue);
-        });
-      });
-      return updateHashState(nextHashMap);
-    },
-    [hashMap]
-  );
-  const removeEntity = useCallback(
-    (key) => {
-      const nextHashMap = produce(hashMap, (draftHashMap) => {
-        draftHashMap.delete(key);
-      });
-      return updateHashState(nextHashMap);
-    },
-    [hashMap]
-  );
-
-  let queuedDownloadUpids = [];
-  for (let key of hashMap.keys()) {
-    if (key !== activeDownloadUpid) {
-      queuedDownloadUpids.push(key);
-    }
-  }
-  Object.freeze(queuedDownloadUpids);
-  //From this point on queuedDownloadUpids is a read-only object, thus making it immutable.
-
-  useEffect(() => {
-    function startFakePoll() {
-      const pollingIntervalId = setInterval(() => {
-        const eventFromFakePoll = generateEventWithProgress();
-
-        setPropertyOnValue(activeDownloadUpid, {
-          deploymentId: eventFromFakePoll.deploymentId,
-          progress: eventFromFakePoll.progress,
-          event: eventFromFakePoll.event,
-        });
-      }, 1000);
-      return () => clearInterval(pollingIntervalId);
-    }
-    const fakePoll = startFakePoll();
-    return fakePoll;
-  }, [setPropertyOnValue, activeDownloadUpid]);
-
-  return (
-    <ExampleHashContext.Provider
-      value={{
-        hashMap,
-        activeDownloadUpid,
-        setActiveDownloadUpid,
-        queuedDownloadUpids,
-        setEmptyDeploymentStatus,
-        getPropertyOnValue,
-        setPropertyOnValue,
-        reorderKeys,
-        removeEntity,
-      }}
-    >
-      {children}
-    </ExampleHashContext.Provider>
-  );
+  return <ReduxProvider store={store}>{children}</ReduxProvider>;
 }
 
 const exampleUpidsToAdd = [
@@ -216,64 +56,59 @@ const exampleUpidsToAdd = [
   "92034-34912-44902-92301",
 ];
 
-const QueuedStatusRowContext = createContext();
+const deploymentStatusMapSelector = (state) => state.deploymentStatusMap,
+  activeDownloadUpidSelector = (state) => state.activeDownloadUpid;
 
-function QueuedStatusRowProvider(props) {
-  const {
-    hashMap,
-    activeDownloadUpid,
-  } = useContext(ExampleHashContext);
-  const clonedHashMap = produce(hashMap, (draftHashMap) => {
-    draftHashMap.delete(activeDownloadUpid);
-  });
+const memoizedQueuedSelector = createSelectorCreator(
+  defaultMemoize,
+  (previousQueuedStatusMap, nextQueuedStatusMap) => {
+    const previousJSONStatusMap = JSON.stringify(
+      Array.from(previousQueuedStatusMap.values())
+    );
+    const nextJSONStatusMap = JSON.stringify(
+      Array.from(nextQueuedStatusMap.values())
+    );
+    return previousJSONStatusMap === nextJSONStatusMap;
+  }
+);
+const queuedDeploymentStatusSelector = createSelector(
+  [deploymentStatusMapSelector, activeDownloadUpidSelector],
+  (deploymentStatusMap, activeDownloadUpid) => {
+    const cloned = produce(deploymentStatusMap, (draftDeploymentStatusMap) => {
+      draftDeploymentStatusMap.delete(activeDownloadUpid);
+    });
+    return cloned;
+  }
+);
 
-  const isNewQueuedStatus = JSON.stringify(Array.from(clonedHashMap.values()))
+const queuedDownloadUpidsSelector = memoizedQueuedSelector(
+  [queuedDeploymentStatusSelector],
+  (clonedDeploymentStatusMap) => {
+    const queuedDownloadUpids = Array.from(clonedDeploymentStatusMap.keys());
+    console.log("how many times do we re-run")
+    return queuedDownloadUpids;
+  }
+);
 
-  const queuedStatus = useMemo(() => {
-    const workingArr = [];
-    for (let [key, value] of clonedHashMap.entries()) {
-      workingArr.push({ upid: key, ...value });
+function Container() {
+  const dispatch = useDispatch();
+
+  const queuedDownloadUpids = useSelector(queuedDownloadUpidsSelector);
+
+  function createANewDeployment() {
+    const upidToAdd = exampleUpidsToAdd.shift();
+    if (upidToAdd) {
+      // an example of how easy it is to add new items to queue,
+      dispatch(setEmptyDeploymentStatus(upidToAdd, {}));
     }
-    return workingArr;
-  }, [isNewQueuedStatus]);
-
-   return <QueuedStatusRowContext.Provider value={queuedStatus} {...props} />;
-}
-
-const ActiveDownloadStatusContext = createContext();
-function ActiveDownloadStatusProvider(props) {
-  const { hashMap, activeDownloadUpid} = useContext(ExampleHashContext);
-
-
-  const cachedActiveState = JSON.stringify(hashMap.get(activeDownloadUpid))
-  
-  const activeDownloadStatus = useMemo(() => {
-    if (hashMap.has(activeDownloadUpid)) {
-      const activeDownloadDeploymentStatus = hashMap.get(activeDownloadUpid);
-      return {
-        upid: activeDownloadUpid,
-        ...activeDownloadDeploymentStatus,
-      };
-    }
-    return null;
-  }, [cachedActiveState, activeDownloadUpid]);
-
-  return <ActiveDownloadStatusContext.Provider value={activeDownloadStatus} {...props} />
-}
-
-const DownloadFunctionsContext = createContext();
-
-function DownloadFunctionsProvider(props) {
-  const { hashMap, activeDownloadUpid, setActiveDownloadUpid, removeEntity, reorderKeys, setEmptyDeploymentStatus} = useContext(ExampleHashContext);
+  }
 
   function handleReorderOfDownloadQueue(ev) {
-     const clonedHashMap = produce(hashMap, (draftHashMap) => {
-       draftHashMap.delete(activeDownloadUpid);
-     });
-    const queuedDownloadUpids = Array.from(clonedHashMap.keys());
     ev.preventDefault();
     // randomly move an index.
-    const randomIndex = Math.ceil(Math.random() * queuedDownloadUpids.length - 1);
+    const randomIndex = Math.ceil(
+      Math.random() * queuedDownloadUpids.length - 1
+    );
     const upidMoving = queuedDownloadUpids[randomIndex];
     // move the upid from one point in the array to another.
     const newlyReorderedArr = [
@@ -281,39 +116,9 @@ function DownloadFunctionsProvider(props) {
       ...queuedDownloadUpids.slice(randomIndex + 1),
       upidMoving,
     ];
-    reorderKeys(newlyReorderedArr);
-}
-
-function handleDeleteADownloadQueueItem(upid) {
-  // an example of an item getting removed after installation. or cancel.
-  removeEntity(upid);
-}
-
-function createANewDeployment() {
-  const upidToAdd = exampleUpidsToAdd.shift();
-  console.log(upidToAdd);
-  if (upidToAdd) {
-    // an example of how easy it is to add new items to queue,
-    setEmptyDeploymentStatus(upidToAdd);
+    dispatch(reorderKeys(newlyReorderedArr));
   }
-}
-  const downloadFunctionsValue = {
-    handleReorderOfDownloadQueue,
-    handleDeleteADownloadQueueItem,
-    createANewDeployment,
-    setActiveDownloadUpid,
-  };
 
-  return <DownloadFunctionsContext.Provider value={downloadFunctionsValue} {...props} />;
-}
-
-
-function Container() {
-  const {
-    createANewDeployment,
-    handleReorderOfDownloadQueue,
-  } = useContext(DownloadFunctionsContext);
- 
   return (
     <div>
       <div className="section">
@@ -325,27 +130,40 @@ function Container() {
         </button>
       </div>
       <div>
-        <ActiveDownloadStatusProvider>
-          <ActiveDownloadRow />
-        </ActiveDownloadStatusProvider>
+        <ActiveDownloadRow />
       </div>
-      <QueuedStatusRowProvider>
-        <div className="queueRows">
-          <QueueList />
-        </div>
-      </QueuedStatusRowProvider>
+      <div className="queueRows">
+        <QueueList />
+      </div>
     </div>
   );
 }
 
+const queuedStatusSelector = memoizedQueuedSelector(
+// const queuedStatusSelector = createSelector(
+  [queuedDeploymentStatusSelector],
+  (deploymentStatusWithoutActive) => {
+    const queuedStatus = [];
+    for (let [key, value] of deploymentStatusWithoutActive.entries()) {
+      queuedStatus.push({ upid: key, ...value });
+    }
+    return queuedStatus;
+  }
+);
+
 function QueueList() {
-  const queuedStatus = useContext(
-    QueuedStatusRowContext
-  );
-  const { handleDeleteADownloadQueueItem, setActiveDownloadUpid } = useContext(
-    DownloadFunctionsContext
-  );
-  const queueRenderCount = useRef(0)
+  const dispatch = useDispatch();
+  const queuedStatus = useSelector(queuedStatusSelector);
+
+  function handleDeleteADownloadQueueItem(upid) {
+    // an example of an item getting removed after installation. or cancel.
+    dispatch(removeEntity(upid));
+  }
+
+  const setDeploymentToActiveDownload = (upid) =>
+    dispatch(setActiveDownloadUpid(upid));
+
+  const queueRenderCount = useRef(0);
 
   return (
     <Fragment>
@@ -353,7 +171,7 @@ function QueueList() {
       {queuedStatus.map((queueStatus, index) => (
         <QueueRow
           key={index}
-          setActiveDownloadUpid={setActiveDownloadUpid}
+          setDeploymentToActiveDownload={setDeploymentToActiveDownload}
           handleDeleteADownloadQueueItem={handleDeleteADownloadQueueItem}
           {...queueStatus}
         />
@@ -366,8 +184,9 @@ function QueueRow({
   upid,
   deploymentId,
   progress,
+  name,
   event,
-  setActiveDownloadUpid,
+  setDeploymentToActiveDownload,
   handleDeleteADownloadQueueItem,
 }) {
   const queueRowRenderCount = useRef(0);
@@ -382,7 +201,11 @@ function QueueRow({
         <p>{deploymentId}</p>
       </div>
       <div className="section">
-        <button onClick={() => setActiveDownloadUpid(upid)}>
+        <h4>name:</h4>
+        <p>{name}</p>
+      </div>
+      <div className="section">
+        <button onClick={() => setDeploymentToActiveDownload(upid)}>
           {" "}
           set activeDownload{" "}
         </button>
@@ -415,14 +238,59 @@ function QueueRow({
   );
 }
 
-function ActiveDownloadRow( ) {
-  const activeDownloadStatus = useContext(ActiveDownloadStatusContext);
-  const {handleDeleteADownloadQueueItem} = useContext(DownloadFunctionsContext);
+const activeDownloadStatusSelector = createSelector(
+  [deploymentStatusMapSelector, activeDownloadUpidSelector],
+  (deploymentStatusMap, activeDownloadUpid) => {
+    if (activeDownloadUpid && deploymentStatusMap.has(activeDownloadUpid)) {
+      const activeDownloadDeploymentStatus = deploymentStatusMap.get(
+        activeDownloadUpid
+      );
+      return {
+        upid: activeDownloadUpid,
+        ...activeDownloadDeploymentStatus,
+      };
+    } else {
+      return null;
+    }
+  }
+);
+
+function ActiveDownloadRow() {
+  const dispatch = useDispatch();
+
+  const activeDownloadStatus = useSelector(activeDownloadStatusSelector);
+
+  function handleDeleteADownloadQueueItem(upid) {
+    // an example of an item getting removed after installation. or cancel.
+    dispatch(removeEntity(upid));
+  }
+
+  useEffect(() => {
+    function startFakePoll() {
+      const pollingIntervalId = setInterval(() => {
+        const eventFromFakePoll = generateEventWithProgress();
+        if (activeDownloadStatus) {
+          dispatch(
+            setPropertyOnValue(activeDownloadStatus.upid, {
+              deploymentId: eventFromFakePoll.deploymentId,
+              progress: eventFromFakePoll.progress,
+              event: eventFromFakePoll.event,
+            })
+          );
+        }
+      }, 1000);
+      return () => clearInterval(pollingIntervalId);
+    }
+    const fakePoll = startFakePoll();
+    return fakePoll;
+  }, [activeDownloadStatus, dispatch]);
+
   const activeDownloadRowRender = useRef(0);
   if (!activeDownloadStatus) {
     return null;
   }
-  const { upid, deploymentId, progress, event } = activeDownloadStatus;
+
+  const { upid, deploymentId, progress, name, event } = activeDownloadStatus;
 
   return (
     <div className="active-row">
@@ -433,6 +301,10 @@ function ActiveDownloadRow( ) {
       <div className="section">
         <h4>deploymentId:</h4>
         <p>{deploymentId}</p>
+      </div>
+      <div className="section">
+        <h4>name:</h4>
+        <p>{name}</p>
       </div>
       <div className="section">
         <button
@@ -466,13 +338,11 @@ function ActiveDownloadRow( ) {
 
 function App() {
   return (
-    <ExampleProvider>
-      <DownloadFunctionsProvider>
+    <DownloadManagerProvider>
       <div className="App">
         <Container />
       </div>
-      </DownloadFunctionsProvider>
-    </ExampleProvider>
+    </DownloadManagerProvider>
   );
 }
 
